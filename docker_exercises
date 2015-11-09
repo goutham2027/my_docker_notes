@@ -1,0 +1,206 @@
+# exercise - 1
+
+NOTE: These Docker exercises can be completed using the Linux Academy Lab Servers running CentOS 6/7. Although the solutions are virtually identical on Debian/Ubuntu systems, the package management commands and service management commands will differ.
+Update your system as appropriate for the distribution you are using. Once updated, for the duration of this exercise, completely disable SELinux on the system and reboot. Once logged in, verify that SELinux is disabled.
+Using the appropriate package management commands, install the 'docker' package. Once installed, enable the service so that it starts upon reboot. Additionally, start the 'docker' service and verify it is running.
+Enable the non-root users to run 'docker' commands on the system. Create the appropriate group, add the users you want to have access to 'docker' commands, restart the 'docker' service and verify that non-root users can run basic 'docker' commands.
+Once 'docker' is installed and non-root users can run commands, use the appropriate 'docker' commands and options to download the latest available image in the public repository for Ubuntu. Once downloaded and installed, verify the image appears in the local base image list.
+Start a container based upon the Ubuntu base image downloaded in Step #4. When you start the container, start it connected to the current terminal, in interactive mode, starting the bash shell for you to connect to. You may exit the container at that time.
+
+ To install on ubuntu: https://docs.docker.com/installation/ubuntulinux/
+
+apt-get install docker-engine
+docker run hello-world
+
+To check if docker services starts at boot time
+initctl list | grep docker
+
+service docker start/stop/restart/status
+
+to add user to docker group
+usermod -aG docker goutham
+
+docker run -i -t ubuntu:latest /bin/bash
+
+
+
+
+
+## exercise - 2
+
+Using the CentOS 6 base image download, start a container based on that image. Be sure that container starts connected to the current terminal in interactive mode and runs the bash command so you are logged in to the command prompt on the container once it boots.
+Once you are sitting at a command prompt on the running container, execute the update command (installing all updates for the container OS).
+Now that updates are complete, install the Apache Web Server. Once installed, make sure the web server service will start and verify that the container is listening on port 80 (install other software if needed to do so).
+Exit the container. Once the container is stopped, execute the appropriate command to list all stopped containers and locate the name and ID of the container you just exited. Make a note of the name and ID.
+Using the name or ID of the container, commit the changes you made within it to a new base image called "newcentos:withapache" and verify that it shows when you list the images on your system.
+
+docker pull centos:centos6
+docker run -it centos:centos6 /bin/bash
+
+yum update -y
+yum install -y httpd
+
+service httpd status
+service httpd start
+
+(copy id)
+exit
+
+docker ps -a
+docker commit -m "installed apache" ca37604fa881 newcentos:withapache
+
+docker images
+
+
+
+
+## ex - 3 ##
+## Creating Custom Images from a Dockerfile ##
+
+1. Create a directory called 'custom' and change to it. In this directory, create an empty file called "Dockerfile".
+2. Edit the "Dockerfile" created in Step #1 above. This configuration file should be written to perform the following actions:
+Use the base Centos 6 Latest version image from the public repository
+Identify you and your email address as the author and maintainer of this image
+Update the base OS after initial import of the image
+Install the Open-SSH Server
+Install Apache Web Server
+Expose ports 22 and 80 to support the services installed
+3. Build the custom image from the 'Dockerfile' as created above. Name/tag this new image as "mycustomimg/withservices:v1". Once the image is built, verify the image appears in your list.
+
+mkdir custom; cd custom
+touch Dockerfile
+vim Dockerfile
+  FROM centos:centos6
+  MAINTAINER goutham <goutham2027@gmail.com>
+  RUN yum update -y
+  RUN yum -y install openssh-server openssh-clients
+  RUN yum -y install httpd
+
+  EXPOSE 80
+  EXPOSE 22
+
+docker build -t mycustomimg/withservices:v1 .
+
+docker images
+
+
+
+
+## ex - 4 ##
+## Managing Containers ##
+1. Create a container from the base image for the latest version of Ubuntu available (if you do not have an Ubuntu base image installed locally, pull the latest one down for your local repository). The container should be started in interactive mode attached to the current terminal and running the bash shell. Once running, shut the container down by exiting.
+2. Run the appropriate Docker command to get the name of the previously run container. Issue the appropriate command to restart the container that you obtained the name of. Do NOT create a new container, restart the one we just used.
+3. Stop the container. Remove that container from the system completely using the appropriate command.
+4. Create (not run) a container called "my_container", create it with parameters that will allow it to run interactively and attached to the local console running the bash shell. Verify that the container is not running.
+5. Start the container and again, verify the container is running. Run the appropriate command to attach your session to the running container so you are logged into the shell.
+See Solution
+
+docker run -it ubuntu:latest /bin/bash
+exit
+
+docker ps -a
+docker start <name>
+docker attach
+exit
+docker rm <img id>
+
+
+
+docker create -it --name="my_container" ubuntu:latest /bin/bash
+docker start my_container
+docker attach my_container
+exit
+
+
+
+## ex - 5 ##
+
+Docker application has been installed and the Docker Daemon has been started. If you have not followed other Docker exercises, prepare your environment by pulling down the base images for 'centos:6' and 'ubuntu:latest'.
+1. Create a directory in your 'user' home directory called 'docker'. Within that directory, create another directory called 'mydata'. Within that directory, create a file called 'mydata.txt' containing any text message you want.
+2. Create a docker container name 'local_vol' from the 'centos:6' image. The container should be created in interactive mode, attached to the current terminal and running the bash shell. Finally create the container with a volume (or directory) called 'containerdata' so that the system will automatically create the directory/mount when the container starts.
+3. List the filesystems within the container, specifically looking for the volume/directory that was added to the container during creation.
+4. Exit the container. This time, create another container called 'remote_vol' with the same container configuration except when creating the volume in the container, link the volume name 'mydata' to the underlying host directory structure created in Step #1.
+5. Once the container is started, list the disk mounts and verify the remote (host) volume is mounted. Change to that directory and verify that the text file created in Step #1 appears with the content created.
+
+docker run -it --name="local_val" -v ~/docker/mydata:/remote_vol centos:centos6 /bin/bash
+
+
+## ex - 6 ##
+1. List all currently install Docker images. If you do not have at least three Docker base images at this point, please pull down other Docker images and/or follow the other exercises in this tutorial.
+2. Execute the command to remove a base image that you have previously created a container from and note the resulting message.
+3. Run the appropriate command to remove the container that Step #2 indicated is preventing the deletion of that base image.
+4. List all previously run containers and remove all of them one at a time. Verify that the command to list stopped containers shows nothing before continuing.
+5. Rerun the command executed in Step #2 and then list the base images on your system.
+
+ docker rmi centos:centos6
+ docker rm <image id> # to remove conflicts
+ docker rmi centos:centos6
+  output: Untagged: centos:centos6
+
+
+
+## ex - 7 ##
+Docker application has been installed and the Docker Daemon has been started. If you have not followed other Docker exercises, prepare your environment by pulling down the base images for 'centos:6' and 'ubuntu:latest'.
+1. Create a container from the 'centos:6' base image on your system. This container does not need to be name but should be run in daemon mode, interactive and connected to the current terminal. Finally, it should start the bash shell on start up
+2. Using the appropriate Docker inspection command, find the IP address and name for the running container. Once you have the IP, ping the IP to be sure it is running. Finally, attach to the running container so you are logged into the shell.
+3. From within the container, install the Open-SSH server and make sure the service is running. From another terminal, try to log into the container over SSH by IP and note the result.
+4. Exit and stop the container. Remove the container from the list of previously run containers once you obtain the name from the appropriate Docker command.
+5. Create another container, name this container 'test_ssh'. When creating the container, it should be run in interactive mode and attached to the current terminal running the bash shell. Finally, expose port 22 on the container to port 8022 on the host system. Once logged in, install the Open-SSH server and make sure the service is running. Find the IP address of the container and note it.
+6. Install the 'sudo' utility. Add a user called 'test' and set a password for that user. Add the 'test' user to the 'sudoers' file. From another terminal window, attempt to log into the container via SSH on port 8022 as the 'test' user and confirm access.
+
+docker run -itd centos:centos6 /bin/bash
+docker inspect backstabbing_sinoussi | grep IPAddres
+ping <ip>
+docker attach backstabbing_sinoussi
+
+
+  yum update -y
+  yum -y install openssh-server openssh-clients
+  service sshd status
+  service sshd start
+
+## ex - 8 ##
+1. Using the Docker base image for Ubuntu, create a container with the following characteristics:
+  - Interactive
+  - Attached to Terminal
+  - Using Google Public DNS
+  - Named 'mycontainer1'
+2. Exit the container from Step #1. Using the Docker base image for Ubuntu, create a container with the following characteristics:
+  - Interactive
+  - Attached to Terminal
+  - Using Google Public DNS
+  - Using Domain Search "mydomain.local"
+  - Named 'mycontainer2'
+3. Exit the container from Step #2. Using the Docker base image for Ubuntu, create a container with the following characteristics:
+  - Interactive
+  - Attached to Terminal
+  - Using Google Public DNS
+  - Using Domain Search "mydomain.local"
+  - Create a mount called '/local_vol'
+  - Create a mount called '/remote_vol' that mounts the file system in /home/user
+  - Named 'mycontainer3'
+4. Exit the container from Step #3. List all the containers. List all characteristics inspected from 'mycontainer2' and then remove and verify removal of all containers.
+
+docker run -it --dns=8.8.8.8 --name="mycontainer3" --dns-search="mydomain.local" -v /local_vol -v /root/Desktop:/remote_vol ubuntu:latest /bin/bash
+
+
+## ex - 9 ##
+
+1. List the base images on the system. Choose a base image for Ubuntu and create a container from that image. This container should be named "basic_web" and should be interactive, attached to the current console and run the bash prompt.
+2. Once you are logged into the container at the prompt, install all updates. After updates are installed, install the Apache Web Server and verify that it is listening on Port 80.
+3. Using the root account profile file in the root home directory, add the command to start the web server whenever a bash session is started. 
+4. Stop the container. Once stopped, commit the container as a base image called "centos:baseweb".
+5. Create a container based on the new "centos:baseweb" image called "test_container". It should run interactively, attached to the console and starting a bash prompt. Once logged into the container, verify that the Apache service is running and port 80 is listening. Exit the container.
+
+docker run -it --name="basic_web" ubuntu:latest /bin/bash
+apt-get update
+apt-get install apache2
+
+service apache2 status/start
+
+vim ~/.bashrc
+
+service apache2 start
+docker commit basic_web ubuntu:basic_web
+docker run -it --name="test_container" ubuntu:latest /bin/bash
+

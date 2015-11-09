@@ -1,0 +1,784 @@
+#insallation
+#centos 6.5
+
+## My Docker notes
+# goutham2027@gmail.com
+
+su -
+# As root
+yum update
+wget http://ftp.osuosl.org/pub/fedora-epel/6/x86_64/epel-release-6-8.noarch.rpm
+rpm -Uvh epel-release-6-8.noarch.rpm
+yum update
+yum install docker-io
+
+service docker start
+ps aux | grep docker
+
+# on restart - start docker service
+chkconfig docker on
+
+docker version
+
+# to get all commands
+docker
+
+docker images
+docker search centos
+docker info
+
+docker pull ubuntu:latest
+docker inspect ubuntu
+
+# Info about current OS
+cat /etc/issue
+
+docker run -i -t ubuntu /bin/bash
+
+
+# working with multiple images
+docker pull training/sinatra
+
+
+## packing a customized container
+docker commit -m="Added a ruby json module using gem" -a="linux academy" 5097200b13e3 linux_academy_sinatra_image
+
+
+## to build an image from scratch
+
+mkdir linux_academy
+cd linux_academy
+touch Dockerfile
+vim Dockerfile
+
+#Dockerfile contents
+
+#####################
+# This is our custom Dockerfile build
+FROM ubuntu:latest
+MAINTAINER goutham <goutham2027@gmail.com>
+RUN apt-get update
+RUN apt-get install -y ruby ruby-dev
+
+####################
+# end of Dockerfile contents
+
+docker build -t="ubuntu:latest" .
+
+It overwrites ubuntu:latest image.
+
+
+########################################
+# Running Container Commands With Docker
+
+docker ps
+
+docker run -t -i ubuntu:latest /bin/bash
+ -t - to connect to tty
+ -i - interactivity.
+
+docker run centos:latest /bin/echo "hello world"
+
+docker run -d ubuntu:latest /bin/bash -c "while true; do echo DOCKERMAN; sleep 1; done"
+ -d - daemon
+
+docker ps
+
+docker logs stoic_leakey
+  - stoic_leakey is the container name (auto assigned) for the container
+
+docker stop stoic_leakey
+
+
+############################################
+# Exposing our container with port redirects
+#
+
+docker pull tutum/apache-php
+
+docker run -t -i tutum/apache-php /bin/bash
+
+ps aux | grep apache # no apache is running
+
+/etc/init.d/apache2 start
+ps aux | grep apache # now we will find
+curl localhost
+
+## from other terminal window
+curl <ip> # we will get same output as previous
+
+docker run -d -p 8080:80 tutum/apache-php
+# map local port 8080 to container port 80
+
+curl 127.0.0.1:8080
+
+
+                                        ##################################
+                                        # Unit -2
+                                        # Docker build and Deployments ###
+
+
+############################
+## Container Snapshots
+#
+
+docker run -t -i centos:centos6 /bin/bash
+yum update
+#copy the image id from bash prompt (eg:root@8b33cd0f7379)
+
+Now
+docker run -t -i centos:centos6 /bin/bash
+
+will give a new container.
+
+docker commit 8b33cd0f7379 centos6:withupdates
+
+Now docker images will have this image - (image name: centos6, tag: withupdates)
+And yum update will not update anything new as it is already updated.
+
+docker run -t -i centos6:withupdates /bin/bash
+yum install httpd
+service httpd start
+yum install lynx
+from container lynx http://localhost
+from hostmachine curl <ip>
+
+docker commit 2296c1f103bd centos6:withapache
+
+
+## Attach to a Running Container
+docker run -t -i centos6:withapache /bin/bash
+
+docker run -t -i -d centos6:withapache /bin/bash # to run as a daemon
+docker ps
+docker inspect nostalgic_meitner(name)
+docker inspect nostalgic_meitner | grep IPAddress | cut -d ":" -f2 | cut -d "\"" -f2
+
+containers are process specific not OS specific.
+
+docker attach nostalgic_meitner (attach to a running container)
+
+ By default nothing starts in a container
+
+ docker run centos6:withapache
+ docker ps (nothing runs). unless we specify what to run, it starts and exit.
+
+## Removing images
+docker images
+docker rmi <image id> (rmi - remove image)
+ If any container depends on another it doesn't remove.
+docker rm <image>
+
+## Directory Structure
+ls /var/lib/docker
+ [containers  devicemapper  graph  init  linkgraph.db  repositories-devicemapper  tmp  trust  volumes]
+cd /var/lib/docker
+cat repositories-devicemapper
+cat repositories-devicemapper  | python -mjson.tool
+# if we remove an entry in json, it doesn't actually remove it. Docker just stops managing that container.
+# but we can do if we delete a container with -f option
+
+cd containers
+cd <id>
+cat config.json | python -mjson.tool
+
+remove manually
+rm -rf inside containers
+
+docker images
+docker rmi centos:centos6
+
+
+#############
+#Date: Tuesday, Sep 23, 2015
+#######################
+# services that run on startup #
+# ########################
+docker run -i -t centos6:withapache /bin/bash
+service httpd start
+
+to start apache when we run bash, in .bashrc
+
+/sbin/service httpd start
+
+why full path for service because .bashrc may run first before PATHs are set.
+
+docker commit a8c368461243 centos6:apacherunning
+
+docker run -i -t -d centos6:apacherunning /bin/bash
+docker inspect elegant_payne
+docker logs elegant_payne
+
+docker run -i -t centos6:apacherunning /bin/bash
+
+to run http when a container starts - not writing commands in .bashrc
+instead we will write commands in a shell script and place it in /bin/
+change permissions to 755
+and update in bashrc
+
+contents of the shell file runhttp.sh
+
+  create in /usr/bin
+
+# .bashrc
+#!/bin/bash
+
+rm -rf /run/httpd/*
+exec /usr/sbin/apachectl -D FOREGROUND
+
+
+chmod 755 /bin/runhttp.sh
+
+in .bashrc file
+
+/bin/runhttp.sh
+
+
+###############################
+# Dockerfile: Tying it together
+# #############################
+
+mkdir build
+cd build
+vi Dockerfile
+
+  # Dockerfile contents
+
+  FROM centos:centos6
+  #order of precedence local, remote
+  MAINTAINER Goutham <goutham2027@gmail.com>
+
+  RUN yum -y update; yum clean all
+  RUN yum -y install httpd
+  RUN echo "This is our new Apache test site" >> /var/www/html/index.html
+
+  EXPOSE 80
+
+  RUN echo "/sbin/service httpd start" >> /root/.bashrc
+
+
+docker build -t goutham:centos6 .
+docker run -i -t -d goutham:centos6 /bin/bash
+docker ps
+docker inspect agitated_noyce | grep IP
+docker logs agitated_noyce
+curl 172.17.0.9
+
+
+## Pushing Images to Docker Hub
+
+Name, email in docker file should match username, email of dockerhub
+To build
+docker build -t goutham2027/centos6:beta1
+docker push goutham2027/centos6:beta1
+docker rmi goutham2027/centos6:beta1
+docker pull goutham2027/centos6:beta1
+
+# Date: Friday, 25 September 2015
+###################################
+#### Adding External Content #####
+##################################
+
+How to distribute/copy content within our container?
+
+Sample Dockerfile
+
+FROM goutham:centos6
+#order of precedence local, remote
+MAINTAINER goutham2027 <goutham2027@gmail.com>
+
+EXPOSE 80
+
+ADD testfile.html /var/www/html/testfile.html
+
+# end of dockerfile
+- Add a testfile.html in build directory.
+- run $ docker build -t test:html .
+
+
+#########################################
+## Image Volumne Management ##
+#########################################
+
+Local OS content to be available to Container.
+Create a volume to a running container, that is separate from the other system volumes
+
+docker images
+docker run -i -t -v /myapp  test:html /bin/bash
+ls / # we will find /myapp volumen
+df -h # we will find an entry for /myapp separated from other volumes.
+
+yet we don't have anything special in /myapp directory
+
+create a directory on host machine -
+$ mkdir myvolume
+$ cd myvolume
+
+map our volume to a mount in our container.
+We are mapping local file system to var volume
+ docker run -i -t -v /root/myvolume:/var/volume test:html /bin/bash
+
+# on host machine
+echo "this is a test " > test.txt
+
+We will find that file.
+
+usecase:
+We can change locally that reflects in the container.
+
+docker run -i -t -d -v /root/myvolume:/var/www/html test:html /bin/bash
+
+Here whatever I change in myvolume gets reflected in /var/www/html on cotnainer.
+
+
+#########################################
+# Advanced Container Network Management
+########################################
+
+ifconfig  also has docker interface. Try this on VM.
+
+
+## setting up docker locally on a vagrant vm ##
+
+  vagrant box list
+  vagrant box add centos65-x86_64-20140116 https://github.com/2creatives/vagrant-centos/releases/download/v6.5.3/centos65-x86_64-20140116.box
+  vagrant init centos65-x86_64-20140116
+
+  vagrant status
+  vagrant up
+
+
+  vagrant status
+  vagrant ssh
+
+  su - root # password vagrant
+
+  yum update
+
+  yum install -y wget
+
+  wget http://ftp.osuosl.org/pub/fedora-epel/6/x86_64/epel-release-6-8.noarch.rpm
+
+  rpm -Uvh epel-release-6-8.noarch.rpm
+
+  yum update
+
+  yum install docker-io
+
+  service docker start
+
+  ps aux | grep docker
+
+  chkconfig docker on
+
+  docker images
+
+  docker pull ubuntu:latest
+
+
+################ End of setting up docker on vagrant ###############
+
+
+# stop docker service
+  service docker stop
+
+  creating bridge
+
+   brctl addbr br10
+    or
+   ip link add br10 type bridge
+
+   ip link set br10 up
+
+   ip addr add 10.10.100.1/24  dev br10
+
+   ifconfig
+
+   # now we will have br10 with ip 10.10.100.1 gateway
+
+
+  service docker start
+
+  docker -d -b br10 &o
+
+  go to a different vagrant ssh shell
+    ## 2nd terminal ##
+      docker run -i -t ubuntu:latest /bin/bash
+
+      ifconfig # we will be on 10.10.100.2 and we can ping 10.10.100.1(gateway)
+
+
+      two ways to persist even after reboot
+        add to /etc/rc.local
+        or add the above commands in a shell script and start on bootup
+
+        to do after boot (ubuntu)
+         cd /etc/network
+         vim interfaces
+          auto br10
+          iface br10 inet static
+                    address 10.10.100.1
+                    netmask 255.255.255.0
+                    bridge_ports dummy0
+                    bridge_stp off
+                    bridge_fd 0
+
+
+      for centos copy ifconfig eth0 remove mac and run
+
+
+                            #############################################
+                            # unit -3: Docker Internals #
+                            #############################################
+
+
+## Interactive shell control ##
+
+docker stop <container_name>
+docker run -i -t --name MYCONTAINER test:html /bin/bash
+
+## Previous Container Management ##
+
+docker ps -a # all containers
+docker ps -a | grep "7 days"
+docker start <name>
+docker attach agitated_noyce
+
+## kill all containers older than 7 days
+docker ps -a | grep '7 days ago' | awk '{print $1}' | xargs docker rm
+docker rm `docker ps -a -q`
+
+## Container Routing ##
+
+# static routing ##
+# set a static route on the system you want access.
+On local vagrant box.
+
+docker run -i -t ubuntu:latest /bin/bash
+
+Not accessible to outside systems
+
+## adding route on the machines.
+route add -net 172.17.0.0 netmask 255.255.255.0 gw 192.168.1.35
+<192.168.1.35> - host IP. It is the ip of the vm on which containers run.
+netstat -rn
+
+
+## sharing container resources ##
+docker run -d -i -t -v /data --name data1 goutham:centos6 /bin/bash
+
+docker run -d -i -t --volumes-from data1 --name data2 goutham:centos6 /bin/bash
+                                  <name of the container from where we want to use volume>
+
+docker attach data1
+echo "test" >> /data/test.txt
+
+docker attach data2
+cat /data/test.txt
+vim /data/test.txt
+
+All changes are reflected instantly.
+
+
+# Committing a running container. (Snapshot images)
+
+docker run -i -t centos:centos6 /bin/bash
+
+yum install which
+
+docker ps
+
+docker commit <name of the container> centos6:which
+
+docker run -i -t centos6:which
+
+The new image has which command. From the first container terminal install sudo
+package and commit with a new image name. The new image have both which and sudo
+packages installed. This way we can maintain different versions of containers without
+actually quitting from it and continuing working on the base image.
+
+
+## Container Linking and Communication
+Expose container services outside of the container.
+Container Linking: Allow containers to exchange information securely, without
+exposing any interfaces and ports.
+
+docker run -i -t -d --name mywebserver goutham:centos6 /bin/bash
+docker ps
+docker run -i -t  --name mytestcontainer --link mywebserver:localweb goutham:centos6 /bin/bash
+
+env | more
+it will show what ports are open on the linked server.
+output of env | more
+
+  LOCALWEB_PORT_80_TCP=tcp://172.17.0.5:80
+  HOSTNAME=53b63d965757
+  LOCALWEB_PORT=tcp://172.17.0.5:80
+  TERM=xterm
+  LOCALWEB_PORT_80_TCP_PORT=80
+  LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=01;05;37;41:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=
+  34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arj=01;31:*.taz=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.d
+  z=01;31:*.gz=01;31:*.lz=01;31:*.xz=01;31:*.bz2=01;31:*.tbz=01;31:*.tbz2=01;31:*.bz=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.rar=01;31:*.ace=01
+  ;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.jpg=01;35:*.jpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01
+  ;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv
+  =01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi
+  =01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.axv=01;35:*.anx=01;35:*.ogv=01;35:*.ogx=0
+  1;35:*.aac=01;36:*.au=01;36:*.flac=01;36:*.mid=01;36:*.midi=01;36:*.mka=01;36:*.mp3=01;36:*.mpc=01;36:*.ogg=01;36:*.ra=01;36:*.wav=01;36:*.axa=01;36:*.oga=0
+  1;36:*.spx=01;36:*.xspf=01;36:
+  LOCALWEB_PORT_80_TCP_PROTO=tcp
+  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  PWD=/
+  LANG=en_US.UTF-8
+  SHLVL=1
+  HOME=/root
+  LOCALWEB_NAME=/mytestcontainer/localweb
+  LESSOPEN=||/usr/bin/lesspipe.sh %s
+  G_BROKEN_FILENAMES=1
+  LOCALWEB_PORT_80_TCP_ADDR=172.17.0.5
+  _=/usr/bin/env
+
+## Taking control of Ports
+
+# map local port 80 to remote(container) port 80
+docker run -i -t -d -p 80:80 --name myweberserver test:html /bin/bash
+
+docker insepect myweberserver | grep IPAddress
+curl http://172.17.0.1
+
+docker run -i -t -d -P --name webserver1 test:html /bin/bash
+docker run -i -t -d -P --name webserver2 test:html /bin/bash
+docker run -i -t -d -P --name webserver3 test:html /bin/bash
+
+Binds container port 80 to any port
+When that container was created, the -P flag was used to automatically map any
+network port inside it to a random high port within an ephemeral port range
+on your Docker host
+
+Used to load balance.
+
+docker run -i -t -d -p 127.0.0.1::80 --name randomweb test:html /bin/bash
+ #bind to localhost. If we try to connect to the ip of the docker host.
+ curl http://172.31.127.134:32771
+ It says it couldn't connect to host. As the container port is bound to 127.0.0.1
+
+
+## Five usefule docker cli commands
+  docker cp
+  docker diff
+  docker events
+  docker history
+  docker exec
+
+## Access contents of the stopped container
+docker cp <contaienr_name>:<path to file> <destination>
+eg: docker cp hungry_cli:/etc/yum.conf /tmp
+
+docker diff: diffs all changes happened since it has started
+docker diff webserver1
+ C - Created
+ A - Added
+ D - Deleted
+
+docker events: events happened in docker in general
+if we want to see what happens when we start a container, system messages issued
+to the docker process when containers are running
+
+On one terminal issue: docker events
+on the second terminal start a new container and check on the first terminal
+for events
+
+docker events --since '2015-08-08'
+
+docker history centos:latest
+
+docker exec: execute commands inside running container
+docker run -d -i -t  --name mytestcontainer1 centos:centos6 /bin/bash
+
+# More docker commands
+  docker info
+  docker kill
+  docker save/export
+  docker load/import
+  docker pause/unpause
+  docker top
+
+   docker run -i -t -d --name ourweb1 test:html /bin/bash
+   docker run -i -t -d --name ourweb2 test:html /bin/bash
+   docker run -i -t -d --name ourweb3 test:html /bin/bash
+
+   docker info
+   docker -D info
+
+To know running process
+ docker top ourweb1
+
+ docker kill ourweb1 (unclean way, fast)
+
+ docker pause ourweb3
+ curl http://<ip>
+ It shouldn't be reachable.
+ docker unpause ourweb3
+
+ docker stop ourweb3
+ docker export/save ourweb3 > ourweb3.tar
+
+ docker load < ourweb3.tar
+ docker load -i ourweb3.tar (both are same)
+
+
+## Optimizing docker builds
+  Docker file contents
+
+```
+  FROM centos:centos6
+  #order of precedence local, remote
+  MAINTAINER goutham2027 <goutham2027@gmail.com>
+
+  RUN yum -y update
+  RUN yum -y install httpd
+  RUN echo "/sbin/service httpd start" >> /root/.bashrc
+
+  RUN yum -y install openssh-server
+  RUN echo "/sbin/service sshd start" >> /root/.bashrc
+
+  RUN echo "The system confi is ended" > /root/README
+```
+Instead of creating a separate image at every image, we can chain the commands.
+Add && in the end and remove RUN. Command Chaining.
+
+```
+RUN yum -y update && yum -y install httpd && echo "/sbin/service httpd start" >> /root/.bashrca && yum -y install openssh-server && echo "/sbin/service sshd start" >> /root/.bashrc && echo "The system confi is ended" > /root/README &&
+```
+
+
+
+                      ######## Unit -4: Integration and use cases ############
+
+# Building a web farm for development and testing (prerequisites)
+
+On virtual machine.
+* Use public connection in vagrant file.
+
+Webfarm with 2 apache web nodes, that are listening on port 80.
+
+ prerequisites: Docker and git
+
+# Part - one
+
+docker rmi ubuntu:latest (remove previous ubuntu:latest docker image)
+
+docker pull centos:centos6
+docker run -i -t centos:centos6 /bin/bash
+
+yum install wget
+wget http://ftp.osuosl.org/pub/fedora-epel/6/x86_64/epel-release-6-8.noarch.rpm
+yum update -y
+yum install which sudo httpd php openssh-server
+which service (/sbin/service)
+
+
+vi .bashrc
+  # add the service that we want to start
+  /sbin/service httpd start
+  /sbin/service openssh-server start
+
+docker commit 4c7588c8c5e1 centos6:baseweb
+
+the service for openssh-server is sshd. But we already have commited.
+
+docker rmi centos6:baseweb
+
+docker commit 4c7588c8c5e1 centos6:baseweb
+docker start 4c7588c8c5e1
+docker attach 4c7588c8c5e1
+ make changes to .bashrc
+
+docker commit 4c7588c8c5e1 centos6:baseweb
+
+docker run -i -t centos6:baseweb /bin/bash (will start both httpd, and sshd services)
+
+# part - two #
+ Download bluefreedom template oswd.
+ create a directory structure:
+  docker
+   - dockerwww (and copy contents of template to this directory)
+
+  docker run -i -t  --name webtest centos6:baseweb /bin/bash
+  docker rm webtest
+
+  docker run --name=webtest -v /root/docker/dockerwww:/var/www/html -i -t centos6:baseweb /bin/bash
+
+
+  Install git on the remote container and make changes to website in  /var/www/html.
+
+## Part - 3 ##
+docker commit webtest centos6:serverv1
+
+docker run --name=externalweb -p 8081:80 -i -t -v /root/docker/dockerwww/:/var/www/html centos6:serverv1 /bin/bash
+Map local port 8081 with remote port 80
+
+## Part - 4 ##
+git clone root@localhost:/root/docker/dockergit dockerwww
+ docker run -d -i -t  --name=devweb1 -p 8081:80 -v /root/docker/dockerwww:/var/www/html centos6:finalwebv1 /bin/bash
+ docker run -d -i -t  --name=devweb2 -p 8082:80 -v /root/docker/dockerwww:/var/www/html centos6:finalwebv1 /bin/bash
+
+ use nginx to reverse proxy
+
+nginx conf
+  default.conf
+
+upstream containerapp {
+        server 10.0.2.15:8081;
+        server 10.0.2.15:8082;
+}
+
+server {
+        listen *:80;
+        server_name 10.0.2.15;
+        index index.html index.htm index.php;
+
+        access_log /var/log/nginx/localweb.log;
+        error_log /var/log/nginx/localerr.log;
+
+        location / {
+                proxy_pass http://containerapp;
+        }
+}
+
+## integrating custom network in docker containers ##
+
+service docker stop
+
+creating a bridge adapter
+
+ip link add br10 type bridge
+  or brctl addbr br:10
+
+ip addr add 10.10.100.1/24 dev br10
+
+ifconfig (will have bridge adapter)
+
+docker -d -b br10 &
+
+docker run -i -t centos:centos6 /bin/bash
+ifconfig (ip is in 10.10.100.3)
+
+two ways to make it persist
+
+ cd /etc
+ cat rc.local ( add these commands to this file)
+
+ or add to .bashrc
+
+ to do after boot
+  /etc/network/interfaces
+
+  auto br10
+  iface br10 inet static
+    address 10.0.100.1
+    netmask 255.255.255.0
+    bridge_ports dummy0
+    bridge_stp off
+    bridge_fd 0
+
+
