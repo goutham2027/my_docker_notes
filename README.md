@@ -28,7 +28,7 @@ docker run -i -t ubuntu:latest /bin/bash
 
 ## Section - X: Running 2 Apache/nginx webserver containers and load balance them
 
-## Section -X: Deploying Rails App using docker.
+## Section - X: Deploying Rails App using docker.
 
 
 ## References
