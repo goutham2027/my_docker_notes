@@ -562,7 +562,7 @@ docker run -i -t -d -p 127.0.0.1::80 --name randomweb test:html /bin/bash
  It says it couldn't connect to host. As the container port is bound to 127.0.0.1
 
 
-## Five usefule docker cli commands
+## Five useful docker cli commands
   docker cp
   docker diff
   docker events
@@ -782,3 +782,12 @@ two ways to make it persist
     bridge_fd 0
 
 
+
+## Docker filesystem
+- Each docker image is composed of layers , with these layers having a parent-child
+hierarchical relationship with each other.
+- All docker file system layers are by default stored at /var/lib/docker/graph.
+ Docker calls it the graph database.
+
+To remove dangling images
+docker rmi $(docker images -f "dangling=true" -q)
